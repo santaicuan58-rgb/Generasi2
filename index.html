@@ -567,9 +567,7 @@ async function startKantorAI() {
 
     // 1. Aktifkan profil OWNER
     const { data: ownerResult, error: ownerError } =
-      await sb.rpc("initialize_owner_profile", {
-        p_full_name: "OWNER"
-      });
+      await sb.rpc("initialize_owner_profile", {})
 
     if (ownerError) {
       throw new Error("Aktivasi OWNER gagal: " + ownerError.message);
