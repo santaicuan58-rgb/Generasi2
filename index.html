@@ -375,8 +375,8 @@ th{color:var(--muted)}
    1. KONFIGURASI SUPABASE
    ========================================= */
 
-const SUPABASE_URL = "https://krcworthhfhebhglybdf.supabase.co";
-const SUPABASE_KEY = "sb_publishable_ewCl1tTwreFkBPf3it32BA_1Mkwg50N";
+const SUPABASE_URL = "https://jxfuwkhizmalqlvtlkgo.supabase.co";
+const SUPABASE_KEY = "sb_publishable__7IXBatzjteugCiEn7l-nQ_JY2_gARk";
 
 const sb = window.supabase.createClient(
   SUPABASE_URL,
@@ -485,21 +485,42 @@ async function ownerLogin() {
   }
 
   button.disabled = true;
-  message.textContent = "Memeriksa akun OWNER...";
+  message.textContent = "Menghubungkan ke Supabase...";
 
-  const {error} = await sb.auth.signInWithPassword({
-    email,
-    password
-  });
+  try {
+    const loginRequest = sb.auth.signInWithPassword({
+      email,
+      password
+    });
 
-  button.disabled = false;
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(
+          "Koneksi login melebihi 20 detik. Periksa jaringan atau koneksi Supabase."
+        ));
+      }, 20000);
+    });
 
-  if (error) {
-    message.textContent = error.message;
-    return;
+    const { data, error } = await Promise.race([
+      loginRequest,
+      timeout
+    ]);
+
+    if (error) throw error;
+
+    if (!data.session) {
+      throw new Error("Login berhasil diproses, tetapi sesi tidak ditemukan.");
+    }
+
+    message.textContent = "Login berhasil. Mengaktifkan kantor AI...";
+    await startKantorAI();
+
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+    message.textContent = error.message || "Login gagal.";
+  } finally {
+    button.disabled = false;
   }
-
-  await startKantorAI();
 }
 
 document.getElementById("loginButton")
@@ -526,6 +547,85 @@ document.getElementById("logoutButton")
    6. MEMUAT DATA OWNER DAN KARYAWAN
    ========================================= */
 
+
+async function startKantorAI() {
+  const loginMessage = document.getElementById("loginMessage");
+  const button = document.getElementById("loginButton");
+
+  try {
+    loginMessage.textContent = "Mengaktifkan profil OWNER...";
+
+    const { data: sessionData, error: sessionError } =
+      await sb.auth.getSession();
+
+    if (sessionError || !sessionData.session) {
+      loginMessage.textContent = "Sesi login tidak ditemukan.";
+      return;
+    }
+
+    const user = sessionData.session.user;
+
+    // 1. Aktifkan profil OWNER
+    const { data: ownerResult, error: ownerError } =
+      await sb.rpc("initialize_owner_profile", {
+        p_full_name: "OWNER"
+      });
+
+    if (ownerError) {
+      throw new Error("Aktivasi OWNER gagal: " + ownerError.message);
+    }
+
+    // 2. Buat atau pastikan 17 karyawan AI tersedia
+    loginMessage.textContent = "Menyiapkan 17 karyawan AI...";
+
+    const { data: employeeResult, error: employeeError } =
+      await sb.rpc("initialize_ai_employees");
+
+    if (employeeError) {
+      throw new Error(
+        "Aktivasi karyawan gagal: " + employeeError.message
+      );
+    }
+
+    // 3. Ambil data karyawan dari database
+    const { data, error } = await sb
+      .from("employees")
+      .select("*")
+      .eq("owner_id", user.id)
+      .order("division")
+      .order("name");
+
+    if (error) {
+      throw new Error("Gagal membaca karyawan: " + error.message);
+    }
+
+    employeesDB = data || [];
+
+    // 4. Pastikan jumlah karyawan sesuai
+    if (employeesDB.length !== 17) {
+      throw new Error(
+        "Jumlah karyawan saat ini " +
+        employeesDB.length +
+        ". Target kita 17 karyawan."
+      );
+    }
+
+    // 5. Tampilkan kantor
+    document.getElementById("ownerLogin").style.display = "none";
+    document.getElementById("app").style.display = "grid";
+
+    renderAll();
+
+    toast("OWNER aktif. 17 karyawan AI berhasil dimuat.");
+
+  } catch (error) {
+    console.error("START KANTOR AI ERROR:", error);
+    loginMessage.textContent = error.message;
+    document.getElementById("ownerLogin").style.display = "flex";
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
 
 
 /* Periksa sesi saat website dibuka kembali */
