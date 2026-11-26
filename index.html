@@ -819,9 +819,12 @@ function renderTasks() {
    ========================================= */
 
 function renderApproval() {
-  const pending = tasks.filter(task =>
-    task.status.toLowerCase().includes("approval")
-  );
+  // Status tugas menggunakan bahasa Indonesia di frontend.
+  // Terima juga status "approval" untuk kompatibilitas data lama.
+  const pending = tasks.filter(task => {
+    const status = String(task.status || "").toLowerCase();
+    return status.includes("approval") || status.includes("persetujuan");
+  });
 
   document.getElementById("approvalCount").textContent =
     pending.length;
